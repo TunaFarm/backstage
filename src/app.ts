@@ -1,22 +1,27 @@
-import express from 'express'
+import express, { Request, Response } from 'express';
+import expressWs from 'express-ws';
 
+import getUserRoutes from './routers/userRoutes';
+import getPlayRoute from './routers/ws/playRoutes';
 
-const app = express();
-const appWS = require('express-ws')(app);
+require('dotenv').config();
 
-const userRoutes = require('./routers/userRoutes');
-const wsPlayRouters = require('./routers/ws/playRoutes');
-
-app.get('/', function (req, res, next) {
-    res.status(200).send('Spellcasters');
+const { app } = expressWs(express(), undefined, {
+  wsOptions: { clientTracking: true },
 });
 
-app.use('/api/user', userRoutes);
-
-app.use("/ws/play", wsPlayRouters);
-
-app.use((req, res, next) => {
-    return res.status(404).send();
+app.get('/', (req: Request, res: Response) => {
+  res.status(200).send('Spellcasters');
 });
 
-module.exports = app;
+app.use('/api/user', getUserRoutes());
+
+// Need to initilize express-ws before import
+app.use('/ws/play', getPlayRoute());
+
+app.use((req: Request, res: Response) => res.status(404).send());
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Running on port ${process.env.PORT}`);
+});

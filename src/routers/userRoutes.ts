@@ -1,12 +1,15 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, Router } from 'express';
+import expressWs from 'express-ws';
 
-const express = require('express');
-const router = express.Router();
+const getUserRoutes = (): expressWs.Router => {
+  const userRoute = Router();
 
-router.post('/', (req: Request, res: Response, next: NextFunction) => {
+  userRoute.post('/', (req: Request, res: Response) => {
     res.json({
-        success: true
-    })
-});
+      success: true,
+    });
+  });
 
-module.exports = router;
+  return userRoute;
+};
+export default getUserRoutes;
