@@ -1,30 +1,50 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-const express = require('express');
-const router = express.Router();
+/* eslint-disable no-console */
+const express_1 = require("express");
+const uuid_1 = require("uuid");
 const roomList = new Map();
-router.ws('/:id', function (ws, req) {
-    const roomID = req.params.id;
-    let room = new Set();
-    if (roomList.has(roomID)) {
-        room = roomList.get(roomID);
-    }
-    else {
-        roomList.set(roomID, room);
-    }
-    room.add(ws);
-    console.log('Connect', roomID, room.size);
-    ws.on('message', function (msg) {
-        for (let wsc of room.values()) {
-            if (ws == wsc) {
-                continue;
+const getPlayRoutes = () => {
+    const playRoute = (0, express_1.Router)();
+    // Generate new roomId or return existed roomId
+    playRoute.post('/', (req, res) => {
+        let id;
+        roomList.forEach((roomInfo, roomId) => {
+            if (roomInfo.length < 4) {
+                id = roomId;
             }
-            wsc.send(msg);
+        });
+        if (!id) {
+            id = (0, uuid_1.v4)();
+            roomList.set(id, []);
         }
+        res.status(200).send({ id });
     });
-    ws.on('close', function () {
-        room.delete(ws);
-        console.log('Leave', roomID, room.size);
+    // Setup ws events when connected
+    playRoute.ws('/:id', (ws, req) => {
+        const roomId = req.params.id;
+        if (!roomId) {
+            console.log('Ws connection failed: Room id not provided');
+            return;
+        }
+        ws.on('message', (data) => {
+            const { id: playerId, message } = JSON.parse(data.toString());
+            const currentRoom = roomList.get(roomId);
+            if (!currentRoom) {
+                ws.send('Ws connection failed: Room not found');
+                return;
+            }
+            currentRoom.forEach(({ id, connection }) => {
+                if (id === playerId) {
+                    return;
+                }
+                connection.send(`Player ${playerId} send message: ${message}`);
+            });
+        });
+        ws.on('close', () => {
+            ws.close();
+        });
     });
-});
-module.exports = router;
+    return playRoute;
+};
+exports.default = getPlayRoutes;

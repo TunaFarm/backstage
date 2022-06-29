@@ -1,10 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-const express = require('express');
-const router = express.Router();
-router.post('/', (req, res, next) => {
-    res.json({
-        success: true
+const express_1 = require("express");
+const getUserRoutes = () => {
+    const userRoute = (0, express_1.Router)();
+    userRoute.post('/', (req, res) => {
+        res.json({
+            success: true,
+        });
     });
-});
-module.exports = router;
+    return userRoute;
+};
+exports.default = getUserRoutes;
