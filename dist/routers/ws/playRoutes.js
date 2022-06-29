@@ -10,38 +10,52 @@ const getPlayRoutes = () => {
     playRoute.post('/', (req, res) => {
         let id;
         roomList.forEach((roomInfo, roomId) => {
-            if (roomInfo.length < 4) {
+            if (roomInfo.size < 4) {
                 id = roomId;
             }
         });
         if (!id) {
             id = (0, uuid_1.v4)();
-            roomList.set(id, []);
+            roomList.set(id, new Map());
         }
-        res.status(200).send({ id });
+        res.status(200).json({ roomId: id });
     });
     // Setup ws events when connected
-    playRoute.ws('/:id', (ws, req) => {
+    playRoute.ws('/:id/:player', (ws, req) => {
         const roomId = req.params.id;
-        if (!roomId) {
-            console.log('Ws connection failed: Room id not provided');
+        const playerId = req.params.player;
+        const currentRoom = roomId ? roomList.get(roomId) : null;
+        if (!roomId || !currentRoom) {
+            console.log('ROOM_NOT_FOUND');
+            ws.send(JSON.stringify({
+                'error': 'ROOM_NOT_FOUND'
+            }));
+            ws.close();
             return;
         }
+        const player = {
+            id: playerId,
+            connection: ws
+        };
+        currentRoom.set(playerId, player);
         ws.on('message', (data) => {
-            const { id: playerId, message } = JSON.parse(data.toString());
-            const currentRoom = roomList.get(roomId);
-            if (!currentRoom) {
-                ws.send('Ws connection failed: Room not found');
-                return;
-            }
-            currentRoom.forEach(({ id, connection }) => {
-                if (id === playerId) {
+            const message = JSON.parse(data.toString());
+            currentRoom.forEach((rplayer) => {
+                if (rplayer.id === player.id) {
                     return;
                 }
-                connection.send(`Player ${playerId} send message: ${message}`);
+                rplayer.connection.send(JSON.stringify({ player: player.id, messsage: message }));
             });
         });
         ws.on('close', () => {
+            const currentRoom = roomList.get(roomId);
+            currentRoom.delete(player.id);
+            if (currentRoom.size) {
+                roomList.set(roomId, currentRoom);
+            }
+            else {
+                roomList.delete(roomId);
+            }
             ws.close();
         });
     });

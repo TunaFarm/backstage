@@ -1,75 +1,88 @@
 /* eslint-disable no-console */
-import { Request, Response, Router } from 'express';
+import {Request, Response, Router} from 'express';
 import expressWs from 'express-ws';
-import { WebSocket } from 'ws';
-import { v4 as uuid } from 'uuid';
+import {WebSocket} from 'ws';
+import {v4 as uuid} from 'uuid';
 
 // Message format - Multiple message types will extend this type
 interface Message {
-  id: string;
-  message: any;
+    message: any;
 }
 
 interface Player {
-  id: string;
-  connection: WebSocket;
+    id: string;
+    connection: WebSocket;
 }
 
-const roomList = new Map<string, Array<Player>>();
+const roomList = new Map<string, Map<string, Player>>();
 
 const getPlayRoutes = (): expressWs.Router => {
-  const playRoute = Router();
+    const playRoute = Router();
 
-  // Generate new roomId or return existed roomId
-  playRoute.post('/', (req: Request, res: Response) => {
-    let id;
-    roomList.forEach((roomInfo, roomId) => {
-      if (roomInfo.length < 4) {
-        id = roomId;
-      }
-    });
+    // Generate new roomId or return existed roomId
+    playRoute.post('/', (req: Request, res: Response) => {
+        let id;
+        roomList.forEach((roomInfo, roomId) => {
+            if (roomInfo.size < 4) {
+                id = roomId;
+            }
+        });
 
-    if (!id) {
-      id = uuid();
-      roomList.set(id, []);
-    }
-
-    res.status(200).send({ id });
-  });
-
-  // Setup ws events when connected
-  playRoute.ws('/:id', (ws: WebSocket, req: Request) => {
-    const roomId = req.params.id;
-
-    if (!roomId) {
-      console.log('Ws connection failed: Room id not provided');
-      return;
-    }
-
-    ws.on('message', (data) => {
-      const { id: playerId, message }: Message = JSON.parse(data.toString());
-      const currentRoom = roomList.get(roomId);
-
-      if (!currentRoom) {
-        ws.send('Ws connection failed: Room not found');
-        return;
-      }
-
-      currentRoom.forEach(({ id, connection }) => {
-        if (id === playerId) {
-          return;
+        if (!id) {
+            id = uuid();
+            roomList.set(id, new Map<string, Player>());
         }
 
-        connection.send(`Player ${playerId} send message: ${message}`);
-      });
+        res.status(200).json({roomId: id});
     });
 
-    ws.on('close', () => {
-      ws.close();
-    });
-  });
+    // Setup ws events when connected
+    playRoute.ws('/:id/:player', (ws: WebSocket, req: Request) => {
+        const roomId = req.params.id;
+        const playerId = req.params.player;
+        const currentRoom = roomId ? roomList.get(roomId) : null;
 
-  return playRoute;
+        if (!roomId || !currentRoom) {
+            console.log('ROOM_NOT_FOUND')
+            ws.send(JSON.stringify({
+                'error': 'ROOM_NOT_FOUND'
+            }));
+            ws.close();
+            return;
+        }
+
+        const player:Player = {
+            id: playerId,
+            connection: ws
+        }
+        currentRoom.set(playerId,player);
+
+        ws.on('message', (data) => {
+            const message = JSON.parse(data.toString());
+
+            currentRoom.forEach((rplayer) => {
+                if (rplayer.id === player.id) {
+                    return;
+                }
+                rplayer.connection.send(JSON.stringify({player: player.id, messsage: message}));
+            });
+        });
+
+        ws.on('close', () => {
+            const currentRoom = roomList.get(roomId) as Map<string, Player>;
+            currentRoom.delete(player.id);
+
+            if (currentRoom.size) {
+                roomList.set(roomId, currentRoom);
+            } else {
+                roomList.delete(roomId)
+            }
+
+            ws.close();
+        });
+    });
+
+    return playRoute;
 };
 
 export default getPlayRoutes;
