@@ -51,11 +51,31 @@ const getPlayRoutes = (): expressWs.Router => {
             return;
         }
 
-        const player:Player = {
+        const player: Player = {
             id: playerId,
             connection: ws
         }
-        currentRoom.set(playerId,player);
+        currentRoom.set(playerId, player);
+
+        //
+        currentRoom.forEach((rplayer) => {
+            if (rplayer.id === player.id) {
+                return;
+            }
+            player.connection.send(JSON.stringify(
+                {
+                    method: 'SUBSCRIBE',
+                    player: rplayer.id
+                }
+            ));
+            rplayer.connection.send(JSON.stringify(
+                {
+                    method: 'SUBSCRIBE',
+                    player: player.id
+                }
+            ));
+        });
+        //
 
         ws.on('message', (data) => {
             const message = JSON.parse(data.toString());
@@ -64,7 +84,12 @@ const getPlayRoutes = (): expressWs.Router => {
                 if (rplayer.id === player.id) {
                     return;
                 }
-                rplayer.connection.send(JSON.stringify({player: player.id, messsage: message}));
+                rplayer.connection.send(JSON.stringify(
+                    {
+                        method: 'MESSAGE',
+                        player: player.id, message: message
+                    }
+                ));
             });
         });
 
@@ -74,6 +99,15 @@ const getPlayRoutes = (): expressWs.Router => {
 
             if (currentRoom.size) {
                 roomList.set(roomId, currentRoom);
+
+                currentRoom.forEach((rplayer) => {
+                    rplayer.connection.send(JSON.stringify(
+                        {
+                            method: 'UNSUBSCRIBE',
+                            player: player.id
+                        }
+                    ));
+                });
             } else {
                 roomList.delete(roomId)
             }
