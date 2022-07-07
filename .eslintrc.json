@@ -39,6 +39,8 @@
         "ts": "never"
       }
     ],
-    "no-console": "warn"
+    "no-console": "warn",
+    "indent": "off",
+    "@typescript-eslint/indent": ["error", 2]
   }
 }

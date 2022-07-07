@@ -1,8 +1,9 @@
+/* eslint-disable no-console */
 import express, { Request, Response } from 'express';
 import expressWs from 'express-ws';
-
-import getUserRoutes from './routers/userRoutes';
-import getPlayRoute from './routers/ws/playRoutes';
+import getAuthRoutes from './routers/auth/authRoutes';
+import getUserRoutes from './routers/user/userRoutes';
+import getPlayRoutes from './routers/ws/playRoutes';
 
 require('dotenv').config();
 
@@ -16,8 +17,9 @@ app.get('/', (req: Request, res: Response) => {
 
 app.use('/api/user', getUserRoutes());
 
-// Need to initilize express-ws before import
-app.use('/ws/play', getPlayRoute());
+app.use('/api/auth', getAuthRoutes());
+
+app.use('/ws/play', getPlayRoutes());
 
 app.use((req: Request, res: Response) => res.status(404).send());
 
